@@ -1,0 +1,50 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+    config.vm.provider "docker" do |d|
+      d.image = "ubuntu:20.04"
+      d.has_ssh = false
+      d.remains_running = true
+      d.cmd = ["tail", "-f", "/dev/null"]
+    end
+    
+    config.vm.synced_folder ".", "/vagrant", type: "rsync"
+    config.vm.network "forwarded_port", guest: 80, host: 8080
+  
+    config.vm.provision "shell", inline: <<-SHELL
+      # Update and install Docker and Docker Compose
+      apt-get update
+      apt-get install -y docker.io docker-compose
+  
+      # Ensure Docker is running
+      systemctl start docker
+      systemctl enable docker
+  
+      # Set environment variables
+      cat << EOF > /vagrant/.env
+  LOG_LEVEL=DEBUG
+  API_KEY=your_api_key
+  ENDPOINT_URL=https://api.example.com
+  REGION=us-west-2
+  ENVIRONMENT=development
+  DATABASE_URL=postgresql://user:password@localhost/dbname
+  REDIS_URL=redis://localhost:6379
+  RABBITMQ_URL=amqp://guest:guest@localhost:5672
+  KAFKA_BROKERS=localhost:9092
+  S3_BUCKET_NAME=your-bucket-name
+  EOF
+  
+      echo "Environment variables have been set in /vagrant/.env"
+      echo "Please update the .env file with your actual values."
+  
+      # Load environment variables
+      set -a
+      source /vagrant/.env
+      set +a
+  
+      # Run docker-compose
+      cd /vagrant
+      docker-compose up -d
+    SHELL
+  end
